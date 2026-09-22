@@ -1,0 +1,53 @@
+name: sportconnect_mobile
+description: SportConnect — app mobile de gestão de equipas desportivas (esqueleto Projeto 1)
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  provider: ^6.1.2
+  http: ^1.2.1
+  flutter_secure_storage: ^9.2.2
+  intl: ^0.19.0
+  image_picker: ^1.1.2
+  socket_io_client: ^2.0.3+1
+  record: 6.2.1
+  audioplayers: ^6.1.0
+  path_provider: ^2.1.4
+  google_fonts: ^6.2.1
+  url_launcher: ^6.3.1
+  webview_flutter: ^4.13.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.2
+  flutter_native_splash: ^2.4.1
+
+# Configuração do ecrã de arranque nativo (o que aparece antes do código
+# Flutter carregar). Depois de mudar isto, corre:
+#   flutter pub get
+#   dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "0A0C10"
+  image: assets/images/logo.png
+  color_dark: "0A0C10"
+  image_dark: assets/images/logo.png
+  android_12:
+    color: "0A0C10"
+    image: assets/images/logo.png
+    color_dark: "0A0C10"
+    image_dark: assets/images/logo.png
+  android: true
+  ios: true
+  web: false
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

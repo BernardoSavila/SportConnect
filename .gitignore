@@ -1,0 +1,19 @@
+# Server
+apps/server/node_modules/
+apps/server/dist/
+apps/server/.env
+apps/server/uploads/*
+!apps/server/uploads/.gitkeep
+apps/server/*.log
+
+# Mobile (Flutter)
+apps/mobile/.dart_tool/
+apps/mobile/build/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/.packages
+
+# Editor / OS
+.DS_Store
+.idea/
+*.swp

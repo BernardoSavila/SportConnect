@@ -1,0 +1,670 @@
+openapi: 3.0.3
+info:
+  title: SportConnect API
+  description: API REST para gestão de equipas desportivas amadoras — Projeto II (implementação completa)
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+    description: Dev local
+
+tags:
+  - name: Auth
+  - name: Teams
+  - name: Events
+  - name: Attendance
+  - name: Posts
+  - name: Users
+  - name: Devices
+  - name: Chat
+  - name: Admin
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registar novo utilizador
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email: { type: string, format: email, example: atleta1@sportconnect.pt }
+                password: { type: string, minLength: 8, example: Password123 }
+                name: { type: string, example: Bernardo Costa }
+                role: { type: string, enum: [athlete, coach, admin], default: athlete }
+                team_id: { type: integer, nullable: true, example: 1 }
+      responses:
+        '201':
+          description: Utilizador criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '409': { description: Email já registado }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Autenticar utilizador
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Login bem-sucedido
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { description: Credenciais inválidas }
+
+  /teams:
+    post:
+      tags: [Teams]
+      summary: Criar equipa (admin)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string }
+      responses:
+        '201': { description: Equipa criada }
+
+  /teams/{id}:
+    get:
+      tags: [Teams]
+      summary: Obter detalhes da equipa
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Detalhes da equipa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Team' }
+        '404': { description: Não encontrado }
+
+  /teams/{id}/members:
+    get:
+      tags: [Teams]
+      summary: Listar membros da equipa
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Lista de membros
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UserProfile' }
+
+  /achievements:
+    post:
+      tags: [Users]
+      summary: Atribuir pontos/medalha a um atleta (coach/admin)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, type]
+              properties:
+                user_id: { type: integer }
+                type: { type: string, example: 'MVP da Jornada' }
+                points: { type: integer, default: 0 }
+      responses:
+        '201': { description: Pontos atribuídos }
+        '403': { description: Sem permissão (não é coach/admin, ou atleta não pertence à equipa) }
+
+  /events:
+    get:
+      tags: [Events]
+      summary: Listar eventos de uma equipa
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: teamId, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Lista de eventos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Event' }
+    post:
+      tags: [Events]
+      summary: Criar evento (coach/admin)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewEvent' }
+            example:
+              team_id: 3
+              title: Treino Táctico
+              description: Treino de finalização
+              start_time: '2026-10-10T18:00:00Z'
+              end_time: '2026-10-10T19:30:00Z'
+              location: Campo A
+              type: training
+      responses:
+        '201':
+          description: Evento criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        '403': { description: Sem permissão }
+
+  /events/{id}/attendance:
+    post:
+      tags: [Attendance]
+      summary: Confirmar/alterar presença num evento
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [present, absent, pending] }
+      responses:
+        '200':
+          description: Presença atualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Attendance' }
+
+  /feed:
+    get:
+      tags: [Posts]
+      summary: Listar posts/avisos de uma equipa
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: teamId, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Lista de posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Post' }
+
+  /posts:
+    post:
+      tags: [Posts]
+      summary: Publicar aviso/post (coach/admin)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewPost' }
+      responses:
+        '201':
+          description: Post criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Post' }
+
+  /posts/{id}/like:
+    post:
+      tags: [Posts]
+      summary: Alternar gosto ("like") num post
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Estado do gosto atualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  post_id: { type: integer }
+                  liked_by_me: { type: boolean }
+                  likes_count: { type: integer }
+
+  /users/me/avatar:
+    patch:
+      tags: [Users]
+      summary: Atualizar a foto de perfil do utilizador autenticado
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [avatar_url]
+              properties:
+                avatar_url: { type: string, description: 'URL devolvido por POST /media/upload' }
+      responses:
+        '200': { description: Avatar atualizado }
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Obter perfil de utilizador
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Perfil do utilizador
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserProfile' }
+
+  /ranking:
+    get:
+      tags: [Users]
+      summary: Ranking de pontos por equipa
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: teamId, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Lista ordenada por pontos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RankingEntry' }
+
+  /devices/register-token:
+    post:
+      tags: [Devices]
+      summary: Registar token de dispositivo (stub FCM)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, platform]
+              properties:
+                token: { type: string }
+                platform: { type: string, enum: [android, ios] }
+      responses:
+        '201': { description: Token registado }
+
+  /chat/conversations:
+    get:
+      tags: [Chat]
+      summary: Listar conversas da equipa
+      description: >-
+        O chat em tempo real (mensagens de texto, imagem e áudio) é servido
+        via Socket.io, não por esta rota REST — ver `realtime.ts`. Este
+        endpoint expõe o histórico já persistido em base de dados.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: teamId, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Lista de mensagens
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ChatMessage' }
+
+  /admin/team:
+    get:
+      tags: [Admin]
+      summary: Obter a ficha institucional da equipa do Admin
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Ficha da equipa, incluindo o treinador atual
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminTeamProfile' }
+        '403': { description: Só acessível a utilizadores com role admin }
+    patch:
+      tags: [Admin]
+      summary: Editar os dados institucionais da equipa
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                founded_at: { type: string, format: date }
+                age_group: { type: string, example: Sub-15 }
+                modality: { type: string, example: Futebol 11 }
+                home_venue: { type: string }
+      responses:
+        '200': { description: Dados atualizados }
+        '400': { description: Nome da equipa vazio }
+
+  /admin/coach:
+    patch:
+      tags: [Admin]
+      summary: Editar a ficha do treinador atual
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                coach_phone: { type: string }
+                coach_certification: { type: string }
+                coach_notes: { type: string }
+      responses:
+        '200': { description: Ficha do treinador atualizada }
+        '404': { description: A equipa não tem treinador atribuído }
+
+  /admin/coach/stats:
+    get:
+      tags: [Admin]
+      summary: Estatísticas individuais e minuciosas do treinador atual
+      description: >-
+        Atividade de gestão (não desempenho de jogo): eventos criados,
+        assiduidade nos seus próprios eventos, avisos publicados, sondagens
+        criadas, dias no cargo. Devolve `null` se a equipa não tiver
+        treinador atribuído.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Estatísticas do treinador, ou null
+          content:
+            application/json:
+              schema:
+                nullable: true
+                allOf:
+                  - $ref: '#/components/schemas/CoachActivityStats'
+
+  /admin/coach-history:
+    get:
+      tags: [Admin]
+      summary: Histórico completo de treinadores da equipa
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Lista ordenada do mais recente para o mais antigo
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CoachHistoryEntry' }
+
+  /admin/coach-history/transfer:
+    post:
+      tags: [Admin]
+      summary: Trocar o treinador da equipa
+      description: >-
+        Cria uma conta nova para o novo treinador (nome, email, password —
+        tal como um registo normal). Fecha o registo histórico do treinador
+        atual (ended_at), que passa a atleta, e abre um novo registo para o
+        novo treinador — nunca apaga histórico.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string }
+                email: { type: string }
+                password: { type: string, description: 'Mínimo 8 caracteres' }
+                notes: { type: string }
+      responses:
+        '200': { description: Treinador trocado com sucesso }
+        '400': { description: Nome, email ou password em falta/inválidos }
+        '409': { description: Já existe uma conta com este email }
+
+  /admin/stats:
+    get:
+      tags: [Admin]
+      summary: Métricas agregadas da equipa
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Estatísticas da equipa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminStats' }
+
+  /admin/roster:
+    get:
+      tags: [Admin]
+      summary: Plantel completo, com estatísticas individuais minuciosas
+      description: >-
+        Para cada atleta: presença, pontos, jogos, golos, assistências,
+        minutos jogados e contactos de emergência/encarregado de educação.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Lista de atletas com estatísticas detalhadas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RosterEntry' }
+
+  /admin/report:
+    get:
+      tags: [Admin]
+      summary: Relatório geral da época, em PDF
+      description: >-
+        Ficha da equipa, treinador atual, histórico de treinadores,
+        atividade da época e plantel completo.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Ficheiro PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    AuthResponse:
+      type: object
+      properties:
+        token: { type: string }
+        user: { $ref: '#/components/schemas/UserProfile' }
+    UserProfile:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [athlete, coach, admin] }
+        team_id: { type: integer, nullable: true }
+        avatar_url: { type: string, nullable: true }
+    Team:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+    Event:
+      type: object
+      properties:
+        id: { type: integer }
+        team_id: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        start_time: { type: string, format: date-time }
+        end_time: { type: string, format: date-time }
+        location: { type: string }
+        type: { type: string, enum: [training, match] }
+        created_by: { type: integer }
+    NewEvent:
+      type: object
+      required: [team_id, title, start_time, end_time, type]
+      properties:
+        team_id: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        start_time: { type: string, format: date-time }
+        end_time: { type: string, format: date-time }
+        location: { type: string }
+        type: { type: string, enum: [training, match] }
+    Attendance:
+      type: object
+      properties:
+        id: { type: integer }
+        event_id: { type: integer }
+        user_id: { type: integer }
+        status: { type: string, enum: [pending, present, absent] }
+        confirmed_at: { type: string, format: date-time, nullable: true }
+    Post:
+      type: object
+      properties:
+        id: { type: integer }
+        team_id: { type: integer }
+        author_id: { type: integer }
+        content: { type: string }
+        media_url: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        likes_count: { type: integer }
+        liked_by_me: { type: boolean }
+    NewPost:
+      type: object
+      required: [team_id, content]
+      properties:
+        team_id: { type: integer }
+        content: { type: string }
+        media_url: { type: string, nullable: true }
+    RankingEntry:
+      type: object
+      properties:
+        user_id: { type: integer }
+        name: { type: string }
+        total_points: { type: integer }
+    ChatMessage:
+      type: object
+      properties:
+        id: { type: integer }
+        team_id: { type: integer }
+        sender_id: { type: integer }
+        content: { type: string, nullable: true }
+        media_url: { type: string, nullable: true, description: 'Presente quando type é image ou audio' }
+        type: { type: string, enum: [text, image, audio], default: text }
+        sent_at: { type: string, format: date-time }
+    AdminTeamProfile:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        invite_code: { type: string }
+        founded_at: { type: string, format: date, nullable: true }
+        age_group: { type: string, nullable: true }
+        modality: { type: string, nullable: true }
+        home_venue: { type: string, nullable: true }
+        member_count: { type: integer }
+        coach:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/CoachProfile'
+    CoachProfile:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        avatar_url: { type: string, nullable: true }
+        coach_started_at: { type: string, format: date-time, nullable: true }
+        coach_phone: { type: string, nullable: true }
+        coach_certification: { type: string, nullable: true }
+        coach_notes: { type: string, nullable: true }
+    CoachHistoryEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time, nullable: true }
+        notes: { type: string, nullable: true }
+        current: { type: boolean, description: 'true quando ended_at é null' }
+        user:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            email: { type: string }
+            avatar_url: { type: string, nullable: true }
+    AdminStats:
+      type: object
+      properties:
+        member_count: { type: integer }
+        total_events: { type: integer }
+        upcoming_events: { type: integer }
+        past_events: { type: integer }
+        attendance_rate: { type: integer, description: 'Percentagem (0-100)' }
+        post_count: { type: integer }
+        poll_count: { type: integer }
+        total_points_awarded: { type: integer }
+    RosterEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        avatar_url: { type: string, nullable: true }
+        position: { type: string, nullable: true }
+        jersey_number: { type: integer, nullable: true }
+        attendance_rate: { type: integer, nullable: true, description: 'Percentagem (0-100); null se ainda sem presenças decididas' }
+        present_count: { type: integer }
+        total_decided: { type: integer }
+        points: { type: integer }
+        achievements_count: { type: integer }
+        games_played: { type: integer }
+        goals: { type: integer }
+        assists: { type: integer }
+        minutes_played: { type: integer }
+        emergency_contact_name: { type: string, nullable: true }
+        emergency_contact_phone: { type: string, nullable: true }
+        guardian_name: { type: string, nullable: true }
+        guardian_phone: { type: string, nullable: true }
+    CoachActivityStats:
+      type: object
+      properties:
+        coach_id: { type: integer }
+        tenure_days: { type: integer, nullable: true }
+        events_created_total: { type: integer }
+        trainings_created: { type: integer }
+        matches_created: { type: integer }
+        attendance_rate_own_events: { type: integer, nullable: true, description: 'Percentagem (0-100)' }
+        posts_published: { type: integer }
+        polls_created: { type: integer }
